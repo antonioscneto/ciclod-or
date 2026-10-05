@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f2f4f1">
+    <title>Contas em andamento | Aging</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script defer src="app.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="./" aria-label="Contas em andamento, início">
+          <span class="brand-mark" aria-hidden="true">CA</span>
+          <span class="brand-copy"><strong>CONTAS</strong><span>GESTÃO DE RECEITA</span></span>
+        </a>
+        <div class="topbar-meta"><span class="live-dot"></span><span id="dataset-label">Nenhuma planilha carregada</span></div>
+      </header>
+
+      <section class="page-heading" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">CICLO DE RECEITA <span>/</span> ACOMPANHAMENTO</p>
+          <h1 id="page-title">Contas em andamento</h1>
+          <p class="subtitle">Visão de permanência por etapa e prioridade de faturamento.</p>
+        </div>
+        <div class="heading-actions">
+          <button class="button button-quiet" id="sample-button" type="button">Ver dados de exemplo</button>
+          <button class="button button-primary" id="upload-button" type="button"><span aria-hidden="true">↑</span> Enviar planilha</button>
+          <input id="file-input" type="file" accept=".csv,.xlsx,.xls" hidden>
+        </div>
+      </section>
+
+      <section class="upload-strip" id="drop-zone" aria-label="Importar planilha">
+        <span class="upload-icon" aria-hidden="true">↥</span>
+        <span><strong>Solte uma planilha aqui</strong><span class="upload-detail">CSV, XLSX ou XLS</span></span>
+        <button class="text-button" id="browse-button" type="button">Procurar arquivo</button>
+        <span class="upload-columns">Unidade · Convênio · Atendimento · Conta · Paciente · Etapa De/Para</span>
+      </section>
+      <p class="message" id="message" role="status" aria-live="polite"></p>
+
+      <section class="kpi-grid" aria-label="Indicadores">
+        <article class="kpi kpi-total"><div class="kpi-label">CONTAS ANALISADAS <span class="kpi-icon">▤</span></div><div class="kpi-value" id="kpi-count">—</div><div class="kpi-foot" id="kpi-count-foot">Aguardando planilha</div></article>
+        <article class="kpi kpi-money"><div class="kpi-label">VALOR EM ABERTO <span class="kpi-icon">R$</span></div><div class="kpi-value" id="kpi-value">—</div><div class="kpi-foot">Soma das contas filtradas</div></article>
+        <article class="kpi kpi-critical"><div class="kpi-label">FAIXA CRÍTICA <span class="status-dot dot-critical"></span></div><div class="kpi-value" id="kpi-critical">—</div><div class="kpi-foot">60 a 75 dias na conta</div></article>
+        <article class="kpi kpi-severe"><div class="kpi-label">FAIXA SEVERA <span class="status-dot dot-severe"></span></div><div class="kpi-value" id="kpi-severe">—</div><div class="kpi-foot">Tempo Conta = +75</div></article>
+        <article class="kpi kpi-shipping"><div class="kpi-label">EM EXPEDIÇÃO <span class="status-dot dot-shipping"></span></div><div class="kpi-value" id="kpi-shipping">—</div><div class="kpi-foot">Etapa 6 ou 7 · fora das faixas</div></article>
+      </section>
+
+      <section class="analysis-grid" aria-label="Análise da carteira">
+        <article class="panel status-panel">
+          <div class="panel-heading"><div><p class="eyebrow">DISTRIBUIÇÃO</p><h2>Prioridade por tempo de conta</h2></div><span class="panel-unit" id="status-total">0 contas</span></div>
+          <div class="status-chart" id="status-chart"><p class="empty-inline">Carregue uma planilha para ver a distribuição.</p></div>
+          <div class="chart-legend"><span><i class="legend-dot legend-normal"></i>No prazo</span><span><i class="legend-dot legend-critical"></i>Crítica</span><span><i class="legend-dot legend-severe"></i>Severa</span><span><i class="legend-dot legend-shipping"></i>Expedição</span></div>
+        </article>
+        <article class="panel unit-panel">
+          <div class="panel-heading"><div><p class="eyebrow">CONCENTRAÇÃO</p><h2>Valor por unidade</h2></div><span class="panel-unit">Top 6</span></div>
+          <div class="unit-chart" id="unit-chart"><p class="empty-inline">Os valores por unidade aparecerão aqui.</p></div>
+        </article>
+      </section>
+
+      <section class="supervisor-section" id="supervisor-section" aria-labelledby="supervisor-title" hidden>
+        <header class="supervisor-heading"><p class="eyebrow">CONSOLIDAÇÃO POR CARTEIRA</p><h2 id="supervisor-title">Supervisor</h2></header>
+        <div class="supervisor-grid" id="supervisor-grid"></div>
+      </section>
+
+      <section class="records-section">
+        <div class="records-heading"><div><p class="eyebrow">DETALHAMENTO</p><h2>Top 10 contas</h2></div><button class="button button-export" id="export-button" type="button" disabled><span aria-hidden="true">↓</span> Exportar Excel</button></div>
+        <div class="filters" aria-label="Filtros da tabela">
+          <label class="search-wrap"><span aria-hidden="true">⌕</span><input id="search-input" type="search" placeholder="Buscar etapa, unidade..." autocomplete="off"></label>
+          <label class="filter-control"><span>Unidade</span><select id="unit-filter"><option value="">Todas</option></select></label>
+          <label class="filter-control"><span>Etapa</span><select id="stage-filter"><option value="">Todas</option></select></label>
+          <label class="filter-control"><span>Prioridade</span><select id="status-filter"><option value="">Todas</option><option value="normal">No prazo</option><option value="critical">Crítica</option><option value="severe">Severa</option><option value="shipping">Expedição</option></select></label>
+          <span class="result-count" id="result-count">0 registros</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Unidade</th><th>Convênio Conta Agrupado</th><th>NR Atendimento</th><th>NR Conta</th><th>Paciente</th><th>Etapa De/Para</th><th>Valor Conta</th><th>Tempo Conta</th><th>Tempo Etapa</th><th>Prioridade</th><th>Supervisor</th></tr></thead>
+            <tbody id="table-body"><tr class="empty-row"><td colspan="11"><span class="empty-mark">＋</span><strong>Sua carteira começa aqui</strong><span>Envie uma planilha ou abra os dados de exemplo.</span></td></tr></tbody>
+          </table>
+        </div>
+        <footer class="table-footer"><span>Top 10 por valor · Excel exporta toda a carteira acima de R$ 5.000.</span><span id="table-page-info"></span></footer>
+      </section>
+      <footer class="app-footer"><span>CONTAS <span class="footer-separator">/</span> AGING</span><span id="updated-at">A análise é atualizada ao importar os dados.</span></footer>
+    </main>
+  </body>
+</html>

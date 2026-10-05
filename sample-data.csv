@@ -1,0 +1,14 @@
+Unidade;Convênio Conta Agrupado;NR Atendimento;NR Conta;Paciente;Etapa - De/Para;Valor Conta;Tempo Conta;Tempo Etapa;Etapa
+Itaim;Bradesco Saúde;56317738;13346680;Paciente 001;01 - Conta aberta → 01.1 - Auditoria in loco;R$ 12.450,00;54;14;01.1 - Auditoria in loco
+ERM-Itaim;SulAmérica;56317739;13346681;Paciente 002;01.1 - Auditoria in loco → 02 - Pré-faturamento;R$ 28.100,00;45;37;02 - Pré-faturamento
+Vila Nova Star;Bradesco Saúde;56317740;13346682;Paciente 003;02 - Pré-faturamento → 03 - Pré-análise;R$ 8.760,50;39;24;03 - Pré-análise
+Maternidade Star;Amil;56317741;13346683;Paciente 004;02 - Pré-faturamento → 03 - Pré-análise;R$ 1.850,00;116;3;03 - Pré-análise
+ERM Maternidade Star;Bradesco Saúde;56317742;13346684;Paciente 005;05 - Contra-auditoria → 06 - Expedição, faturamento;R$ 34.700,00;48;3;06 - Expedição, faturamento
+Morumbi;Unimed;56317743;13346685;Paciente 006;06 - Expedição, faturamento → 07 - Expedição, protocolado;R$ 6.920,00;55;45;07 - Expedição, protocolado
+ERM Morumbi;Bradesco Saúde;56317744;13346686;Paciente 007;03 - Pré-análise → 04 - Central de autorizações;R$ 19.850,00;71;0;04 - Central de autorizações
+Jabaquara;Amil;56317745;13346687;Paciente 008;04 - Central de autorizações → 05 - Contra-auditoria;R$ 11.240,00;56;67;05 - Contra-auditoria
+Criança;SulAmérica;56317746;13346688;Paciente 009;07 - Expedição, protocolado → 08 - Simultâneo, protocolado;R$ 22.500,00;77;67;08 - Simultâneo, protocolado
+Santa Isabel;Unimed;56317747;13346689;Paciente 010;08 - Simultâneo, protocolado → 10 - Expedição, NF emitida;R$ 4.580,00;8;0;10 - Expedição, NF emitida
+Santa Cruz;Bradesco Saúde;56317748;13346690;Paciente 011;10 - Expedição, NF emitida → 13 - Negociação concluída;R$ 9.340,00;67;67;13 - Negociação concluída
+Itaim;Amil;56317749;13346691;Paciente 012;13 - Negociação concluída → 14 - Contas não factíveis;R$ 2.000,00;44;0;14 - Contas não factíveis
+Total;;;;;;R$ 29.649.637,00;;;;
