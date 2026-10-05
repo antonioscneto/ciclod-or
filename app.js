@@ -57,7 +57,7 @@ const elements = Object.fromEntries([
   "file-input", "upload-button", "browse-button", "sample-button", "drop-zone", "message", "dataset-label",
   "kpi-count", "kpi-count-foot", "kpi-value", "kpi-critical", "kpi-severe", "kpi-shipping", "status-total",
   "status-chart", "unit-chart", "search-input", "unit-filter", "stage-filter", "status-filter", "result-count", "table-body",
-  "table-page-info", "export-button", "updated-at", "supervisor-section", "supervisor-grid"
+  "table-page-info", "export-button", "updated-at", "supervisor-section", "supervisor-grid", "header-logo", "logo-fallback"
 ].map((id) => [id.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase()), document.getElementById(id)]));
 
 function normalize(value) {
@@ -454,6 +454,12 @@ const sampleMatrix = [
 
 elements.uploadButton.addEventListener("click", () => elements.fileInput.click());
 elements.browseButton.addEventListener("click", () => elements.fileInput.click());
+const showLogoFallback = () => {
+  elements.headerLogo.hidden = true;
+  elements.logoFallback.hidden = false;
+};
+elements.headerLogo.addEventListener("error", showLogoFallback);
+if (elements.headerLogo.complete && elements.headerLogo.naturalWidth === 0) showLogoFallback();
 elements.fileInput.addEventListener("change", (event) => importFile(event.target.files[0]));
 elements.sampleButton.addEventListener("click", () => {
   try { setRows(rowsFromMatrix(sampleMatrix), "Dados de exemplo"); }

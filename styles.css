@@ -26,11 +26,15 @@ button, input, select { font: inherit; }
 button { cursor: pointer; }
 .app-shell { width: min(1440px, 100%); margin: 0 auto; padding: 0 42px 24px; }
 .topbar { height: 66px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; color: #ffffff; background: #0b2545; border-radius: 0 0 5px 5px; }
-.brand { display: inline-flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; }
-.brand-mark { width: 32px; height: 32px; display: grid; place-items: center; background: var(--green); color: white; border-radius: 7px 7px 7px 2px; font-size: 11px; font-weight: 800; }
+.brand { display: inline-flex; align-items: center; color: inherit; text-decoration: none; }
+.header-brand { gap: 0; }
+.brand-logo-slot { width: auto; height: 38px; display: flex; flex: 0 0 auto; align-items: center; }
+.header-logo { display: block; height: 38px; width: auto; max-width: 150px; margin-right: 14px; object-fit: contain; filter: brightness(0) invert(1); vertical-align: middle; }
+.brand-logo-fallback { width: 48px; height: 38px; display: grid; place-items: center; margin-right: 14px; border: 1px dashed rgba(255, 255, 255, .62); border-radius: 4px; color: rgba(255, 255, 255, .8); font-size: 7px; font-weight: 700; letter-spacing: .08em; }
+.brand-logo-fallback[hidden] { display: none; }
 .brand-copy { display: grid; gap: 1px; }
-.brand-copy strong { font-size: 13px; font-weight: 800; letter-spacing: .06em; }
-.brand-copy span { color: rgba(255, 255, 255, .72); font-size: 8px; font-weight: 700; letter-spacing: .13em; }
+.brand-copy strong { font-size: 15px; font-weight: 800; }
+.brand-copy span { color: rgba(255, 255, 255, .72); font-size: 9px; font-weight: 600; }
 .topbar-meta { display: flex; align-items: center; gap: 8px; color: rgba(255, 255, 255, .82); font-size: 11px; }
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #78aee8; }
 .page-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; padding: 31px 0 20px; }
