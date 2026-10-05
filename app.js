@@ -80,18 +80,30 @@ function getSupervisor(row) {
 
 function renderSupervisor(rows, selectedStage) {
   const stageCode = getStageCode(selectedStage);
+  const isAllStages = !stageCode;
   const definitions = stageCode === "4"
     ? supervisorPortfolios["04"]
     : ["6", "7", "8"].includes(stageCode)
       ? supervisorPortfolios["06-07-08"]
-      : null;
+      : isAllStages
+        ? [
+          ...(rows.some((row) => getStageCode(row.etapa) === "4") ? supervisorPortfolios["04"] : []),
+          ...(rows.some((row) => ["6", "7", "8"].includes(getStageCode(row.etapa))) ? supervisorPortfolios["06-07-08"] : [])
+        ]
+        : null;
+  const analysisRows = rows.filter((row) => {
+    const rowStage = getStageCode(row.etapa);
+    if (stageCode === "4") return rowStage === "4";
+    if (["6", "7", "8"].includes(stageCode)) return ["6", "7", "8"].includes(rowStage);
+    return isAllStages && ["4", "6", "7", "8"].includes(rowStage);
+  });
 
-  elements.supervisorSection.hidden = !definitions;
-  if (!definitions) return;
+  elements.supervisorSection.hidden = !definitions || analysisRows.length === 0;
+  if (!definitions || analysisRows.length === 0) return;
 
-  const analyzedValue = rows.reduce((total, row) => total + (row.valor ?? 0), 0);
+  const analyzedValue = analysisRows.reduce((total, row) => total + (row.valor ?? 0), 0);
   elements.supervisorGrid.innerHTML = definitions.map(({ name, agreements }) => {
-    const accounts = rows.filter((row) => getSupervisor(row) === name);
+    const accounts = analysisRows.filter((row) => getSupervisor(row) === name);
     const value = accounts.reduce((total, row) => total + (row.valor ?? 0), 0);
     const averageTicket = accounts.length ? value / accounts.length : null;
     const agingValues = accounts.map((row) => row.aging ?? row.tempoConta).filter((aging) => aging !== null && Number.isFinite(aging));
@@ -391,19 +403,36 @@ async function importFile(file) {
   }
 }
 
-function exportExcel() {
-  if (!window.XLSX) {
+async function exportExcel() {
+  if (!window.ExcelJS) {
     setMessage("O recurso de Excel não carregou. Verifique a conexão e recarregue a página para exportar.");
     return;
   }
-  const headers = ["Unidade", "Convênio Conta Agrupado", "NR Atendimento", "NR Conta", "Paciente", "Etapa - De/Para", "Valor Conta", "Tempo Conta", "Tempo Etapa", "Prioridade", "Supervisor"];
   const rows = sortRows(state.rows).filter((row) => row.valor !== null && row.valor > 5000);
-  const data = rows.map((row) => [row.unidade, row.convenio, row.atendimento, row.conta, row.paciente, row.transicao, row.valor ?? "", row.tempoConta ?? "", row.tempoEtapa ?? "", statusInfo[getStatus(row)].label, getSupervisor(row) || ""]);
-  const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
-  worksheet["!cols"] = [{ wch: 22 }, { wch: 24 }, { wch: 16 }, { wch: 16 }, { wch: 24 }, { wch: 34 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }];
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Contas acima de 5000");
-  XLSX.writeFile(workbook, "contas-acima-de-5000.xlsx");
+  const headers = ["Unidade", "Convênio Conta Agrupado", "NR Atendimento", "NR Conta", "Paciente", "Etapa - De/Para", "Valor Conta", "Tempo Conta", "Tempo Etapa", "Prioridade", "Supervisor"];
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Contas acima de 5000");
+  worksheet.addRow(headers);
+  rows.forEach((row) => worksheet.addRow([row.unidade, row.convenio, row.atendimento, row.conta, row.paciente, row.transicao, row.valor ?? "", row.tempoConta ?? "", row.tempoEtapa ?? "", statusInfo[getStatus(row)].label, getSupervisor(row) || ""]));
+  worksheet.columns = [{ width: 22 }, { width: 24 }, { width: 16 }, { width: 16 }, { width: 24 }, { width: 34 }, { width: 16 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 16 }];
+  worksheet.eachRow({ includeEmpty: true }, (row) => {
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.font = { name: "Aptos Narrow", size: 11, ...(row.number === 1 ? { bold: true } : {}) };
+    });
+  });
+
+  try {
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "contas-acima-de-5000.xlsx";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  } catch (error) {
+    setMessage(error instanceof Error ? `Não foi possível gerar o Excel: ${error.message}` : "Não foi possível gerar o arquivo Excel.");
+  }
 }
 
 const sampleMatrix = [
