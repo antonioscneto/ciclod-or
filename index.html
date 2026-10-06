@@ -46,7 +46,7 @@
         <article class="kpi kpi-money"><div class="kpi-label">VALOR EM ABERTO <span class="kpi-icon">R$</span></div><div class="kpi-value" id="kpi-value">—</div><div class="kpi-foot">Soma das contas filtradas</div></article>
         <article class="kpi kpi-critical"><div class="kpi-label">FAIXA CRÍTICA <span class="status-dot dot-critical"></span></div><div class="kpi-value" id="kpi-critical">—</div><div class="kpi-foot">60 a 75 dias na conta</div></article>
         <article class="kpi kpi-severe"><div class="kpi-label">FAIXA SEVERA <span class="status-dot dot-severe"></span></div><div class="kpi-value" id="kpi-severe">—</div><div class="kpi-foot">Tempo Conta = +75</div></article>
-        <article class="kpi kpi-shipping"><div class="kpi-label">EM EXPEDIÇÃO <span class="status-dot dot-shipping"></span></div><div class="kpi-value" id="kpi-shipping">—</div><div class="kpi-foot">Etapa 6 ou 7 · fora das faixas</div></article>
+        <article class="kpi kpi-shipping"><div class="kpi-label">EM EXPEDIÇÃO <span class="status-dot dot-shipping"></span></div><div class="kpi-value" id="kpi-shipping">—</div><div class="kpi-foot">Etapas 6, 7 ou 8 · pode sobrepor faixas</div></article>
       </section>
 
       <section class="analysis-grid" aria-label="Análise da carteira">
@@ -54,6 +54,7 @@
           <div class="panel-heading"><div><p class="eyebrow">DISTRIBUIÇÃO</p><h2>Prioridade por tempo de conta</h2></div><span class="panel-unit" id="status-total">0 contas</span></div>
           <div class="status-chart" id="status-chart"><p class="empty-inline">Carregue uma planilha para ver a distribuição.</p></div>
           <div class="chart-legend"><span><i class="legend-dot legend-normal"></i>No prazo</span><span><i class="legend-dot legend-critical"></i>Crítica</span><span><i class="legend-dot legend-severe"></i>Severa</span><span><i class="legend-dot legend-shipping"></i>Expedição</span></div>
+          <p class="status-note">Em expedição é uma marca adicional e pode aparecer junto com Crítica ou Severa.</p>
         </article>
         <article class="panel unit-panel">
           <div class="panel-heading"><div><p class="eyebrow">CONCENTRAÇÃO</p><h2>Valor por unidade</h2></div><span class="panel-unit">Top 6</span></div>
@@ -72,13 +73,13 @@
           <label class="search-wrap"><span aria-hidden="true">⌕</span><input id="search-input" type="search" placeholder="Buscar etapa, unidade..." autocomplete="off"></label>
           <label class="filter-control"><span>Unidade</span><select id="unit-filter"><option value="">Todas</option></select></label>
           <label class="filter-control"><span>Etapa</span><select id="stage-filter"><option value="">Todas</option></select></label>
-          <label class="filter-control"><span>Prioridade</span><select id="status-filter"><option value="">Todas</option><option value="normal">No prazo</option><option value="critical">Crítica</option><option value="severe">Severa</option><option value="shipping">Expedição</option></select></label>
+          <label class="filter-control"><span>Prioridade</span><select id="status-filter"><option value="">Todas</option><option value="normal">No prazo</option><option value="critical">Crítica</option><option value="severe">Severa</option><option value="shipping">Em expedição</option><option value="missing-protocol">Sem protocolo (Ricardo)</option></select></label>
           <span class="result-count" id="result-count">0 registros</span>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Unidade</th><th>Convênio Conta Agrupado</th><th>NR Atendimento</th><th>NR Conta</th><th>Paciente</th><th>Etapa De/Para</th><th>Valor Conta</th><th>Tempo Conta</th><th>Tempo Etapa</th><th>Prioridade</th><th>Supervisor</th></tr></thead>
-            <tbody id="table-body"><tr class="empty-row"><td colspan="11"><span class="empty-mark">＋</span><strong>Sua carteira começa aqui</strong><span>Envie uma planilha ou abra os dados de exemplo.</span></td></tr></tbody>
+            <thead><tr><th>Unidade</th><th>Convênio Conta Agrupado</th><th>NR Atendimento</th><th>NR Conta</th><th>Paciente</th><th>Etapa De/Para</th><th>Valor Conta</th><th>Tempo Conta</th><th>Tempo Etapa</th><th>Protocolo</th><th>Prioridade / alertas</th><th>Supervisor</th></tr></thead>
+            <tbody id="table-body"><tr class="empty-row"><td colspan="12"><span class="empty-mark">＋</span><strong>Sua carteira começa aqui</strong><span>Envie uma planilha ou abra os dados de exemplo.</span></td></tr></tbody>
           </table>
         </div>
         <footer class="table-footer"><span>Top 10 por valor · Excel exporta toda a carteira acima de R$ 5.000.</span><span id="table-page-info"></span></footer>

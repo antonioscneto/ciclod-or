@@ -15,8 +15,11 @@ Aplicação leve em HTML/JavaScript para analisar contas hospitalares usando as 
 ## Regra aplicada
 
 - As etapas `06 - Expedição, faturamento` e `07 - Expedição, protocolado` são consideradas em expedição.
-- Se `Tempo Conta` estiver entre `60` e `75` e a conta ainda não estiver em expedição, ela entra em situação crítica.
+- A etapa `08 - Simultâneo, protocolado` também é considerada em expedição.
+- Se `Tempo Conta` estiver entre `60` e `75`, a conta entra em situação crítica, inclusive quando também estiver em expedição.
 - Se `Tempo Conta` for maior que `75`, a conta é severa.
+- As faixas de aging são independentes de expedição: uma conta pode ser crítica ou severa e também estar em expedição.
+- Contas de Ricardo nas etapas `07` e `08` sem protocolo são sinalizadas. O protocolo é lido pelo cabeçalho `Protocolo` ou pela coluna `AX`.
 - Linhas de resumo identificadas como `Total` não entram na soma de `Valor Conta`.
 - O detalhamento mostra as 10 contas de maior `Valor Conta`, em ordem decrescente.
 - A exportação Excel inclui todas as contas com `Valor Conta` acima de `R$ 5.000`, em ordem decrescente, mantendo a prioridade.

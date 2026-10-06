@@ -1,4 +1,4 @@
-const state = { rows: [], filtered: [], fileName: "" };
+const state = { rows: [], filtered: [], fileName: "", hasProtocolColumn: false };
 
 const fields = {
   etapa: ["etapa"],
@@ -11,6 +11,7 @@ const fields = {
   tempoEtapa: ["tempoetapa"],
   aging: ["agingconta"],
   valor: ["valorconta"],
+  protocolo: ["protocolo", "nrprotocolo", "numeroprotocolo"],
   unidade: ["unidade"]
 };
 
@@ -203,7 +204,8 @@ function rowsFromMatrix(matrix) {
   for (const [field, aliases] of Object.entries(fields)) {
     indexes[field] = headers.findIndex((header) => aliases.includes(header));
   }
-  const optionalFields = new Set(["etapa", "aging"]);
+  if (indexes.protocolo < 0 && headers.length > 49) indexes.protocolo = 49;
+  const optionalFields = new Set(["etapa", "aging", "protocolo"]);
   const missing = Object.entries(indexes).filter(([field, index]) => index < 0 && !optionalFields.has(field)).map(([field]) => ({
     transicao: "Etapa - De/Para", convenio: "Convênio Conta Agrupado", atendimento: "NR Atendimento",
     conta: "NR Conta", paciente: "Paciente", tempoConta: "Tempo Conta", tempoEtapa: "Tempo Etapa",
@@ -226,6 +228,7 @@ function rowsFromMatrix(matrix) {
       tempoEtapa: parseNumber(cells[indexes.tempoEtapa]),
       aging: parseNumber(cells[indexes.aging]),
       valor: parseNumber(cells[indexes.valor]),
+      protocolo: value("protocolo"),
       unidade: value("unidade") || "Não informada"
     };
   }).filter((row) => row.unidade !== "Não informada" || row.conta || row.atendimento);
@@ -235,17 +238,24 @@ function isShipping(stage) {
   const text = String(stage ?? "").trim();
   const codeMatch = text.match(/^\s*0*(\d+(?:\.\d+)?)/);
   const code = codeMatch?.[1].replace(/^0+(?=\d)/, "");
-  if (code) return code === "6" || code === "7";
+  if (code) return ["6", "7", "8"].includes(code);
   const target = destinationStage(text);
   const targetCode = target.match(/^\s*0*(\d+(?:\.\d+)?)/)?.[1]?.replace(/^0+(?=\d)/, "");
-  return targetCode === "6" || targetCode === "7";
+  return ["6", "7", "8"].includes(targetCode);
 }
 
 function getStatus(row) {
-  if (isShipping(row.etapa)) return "shipping";
   if (row.tempoConta !== null && row.tempoConta > 75) return "severe";
   if (row.tempoConta !== null && row.tempoConta >= 60 && row.tempoConta <= 75) return "critical";
   return "normal";
+}
+
+function isProtocolMissing(row) {
+  const protocol = normalize(row.protocolo);
+  return state.hasProtocolColumn
+    && getSupervisor(row) === "Ricardo"
+    && ["7", "8"].includes(getStageCode(row.etapa))
+    && ["", "na", "nd", "naoseaplica"].includes(protocol);
 }
 
 function formatCurrency(value, compact = false) {
@@ -268,15 +278,16 @@ function setMessage(message = "") {
   elements.message.textContent = message;
 }
 
-function setRows(rows, fileName) {
+function setRows(rows, fileName, hasProtocolColumn = false) {
   if (!rows.length) throw new Error("Não encontrei linhas com dados nessa planilha.");
   state.rows = rows;
   state.fileName = fileName;
+  state.hasProtocolColumn = hasProtocolColumn;
   elements.datasetLabel.textContent = fileName;
   elements.exportButton.disabled = false;
   populateUnitFilter();
   populateStageFilter();
-  setMessage("");
+  setMessage(hasProtocolColumn ? "" : "Coluna Protocolo não encontrada; alertas de protocolo não podem ser avaliados.");
   render();
   elements.updatedAt.textContent = `Importado em ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date())}`;
 }
@@ -311,9 +322,12 @@ function render() {
   const stage = elements.stageFilter.value;
   const status = elements.statusFilter.value;
   state.filtered = state.rows.filter((row) => {
-    const rowStatus = getStatus(row);
     const matchesQuery = !query || normalize(`${row.unidade} ${row.convenio} ${row.atendimento} ${row.conta} ${row.paciente} ${row.transicao}`).includes(query);
-    return matchesQuery && (!unit || row.unidade === unit) && (!stage || row.etapa === stage) && (!status || rowStatus === status);
+    const matchesStatus = !status
+      || (status === "shipping" ? isShipping(row.etapa)
+        : status === "missing-protocol" ? isProtocolMissing(row)
+          : getStatus(row) === status);
+    return matchesQuery && (!unit || row.unidade === unit) && (!stage || row.etapa === stage) && matchesStatus;
   });
   const rows = sortRows(state.filtered);
   renderMetrics(state.filtered);
@@ -330,6 +344,7 @@ function renderMetrics(rows) {
   for (const row of rows) {
     const status = getStatus(row);
     if (status in counts) counts[status] += 1;
+    if (isShipping(row.etapa)) counts.shipping += 1;
     if (row.valor !== null) { totalValue += row.valor; valueCount += 1; }
   }
   elements.kpiCount.textContent = formatCount(rows.length);
@@ -343,7 +358,10 @@ function renderMetrics(rows) {
 function renderStatusChart(rows) {
   const order = ["normal", "critical", "severe", "shipping"];
   const counts = Object.fromEntries(order.map((key) => [key, 0]));
-  rows.forEach((row) => { counts[getStatus(row)] += 1; });
+  rows.forEach((row) => {
+    counts[getStatus(row)] += 1;
+    if (isShipping(row.etapa)) counts.shipping += 1;
+  });
   const max = Math.max(1, ...Object.values(counts));
   elements.statusTotal.textContent = `${formatCount(rows.length)} ${rows.length === 1 ? "conta" : "contas"}`;
   elements.statusChart.innerHTML = order.map((key) => {
@@ -377,7 +395,12 @@ function renderTable(rows) {
   elements.tableBody.innerHTML = topRows.map((row) => {
     const info = statusInfo[getStatus(row)];
     const supervisor = getSupervisor(row) || "—";
-    return `<tr><td>${escapeHTML(row.unidade)}</td><td>${escapeHTML(row.convenio || "—")}</td><td class="number-cell">${escapeHTML(row.atendimento || "—")}</td><td class="number-cell">${escapeHTML(row.conta || "—")}</td><td>${escapeHTML(row.paciente || "—")}</td><td class="stage-cell">${escapeHTML(row.transicao || "—")}</td><td class="number-cell">${formatCurrency(row.valor)}</td><td class="number-cell">${row.tempoConta === null ? "—" : `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(row.tempoConta)} dias`}</td><td class="number-cell">${row.tempoEtapa === null ? "—" : `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(row.tempoEtapa)} dias`}</td><td><span class="badge ${info.badge}">${info.label}</span></td><td>${supervisor}</td></tr>`;
+    const badges = [
+      `<span class="badge ${info.badge}">${info.label}</span>`,
+      ...(isShipping(row.etapa) ? [`<span class="badge ${statusInfo.shipping.badge}">Em expedição</span>`] : []),
+      ...(isProtocolMissing(row) ? ['<span class="badge badge-protocol-missing">Sem protocolo</span>'] : [])
+    ].join("");
+    return `<tr><td>${escapeHTML(row.unidade)}</td><td>${escapeHTML(row.convenio || "—")}</td><td class="number-cell">${escapeHTML(row.atendimento || "—")}</td><td class="number-cell">${escapeHTML(row.conta || "—")}</td><td>${escapeHTML(row.paciente || "—")}</td><td class="stage-cell">${escapeHTML(row.transicao || "—")}</td><td class="number-cell">${formatCurrency(row.valor)}</td><td class="number-cell">${row.tempoConta === null ? "—" : `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(row.tempoConta)} dias`}</td><td class="number-cell">${row.tempoEtapa === null ? "—" : `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(row.tempoEtapa)} dias`}</td><td class="number-cell">${escapeHTML(row.protocolo || "—")}</td><td><div class="priority-badges">${badges}</div></td><td>${supervisor}</td></tr>`;
   }).join("");
 }
 
@@ -395,7 +418,9 @@ async function importFile(file) {
     } else {
       throw new Error("Formato não suportado. Selecione um arquivo CSV, XLSX ou XLS.");
     }
-    setRows(rowsFromMatrix(matrix), file.name);
+    const headers = matrix[0].map(normalize);
+    const hasProtocolColumn = headers.some((header) => fields.protocolo.includes(header)) || headers.length > 49;
+    setRows(rowsFromMatrix(matrix), file.name, hasProtocolColumn);
   } catch (error) {
     setMessage(error instanceof Error ? error.message : "Não foi possível ler a planilha.");
   } finally {
@@ -409,12 +434,12 @@ async function exportExcel() {
     return;
   }
   const rows = sortRows(state.rows).filter((row) => row.valor !== null && row.valor > 5000);
-  const headers = ["Unidade", "Convênio Conta Agrupado", "NR Atendimento", "NR Conta", "Paciente", "Etapa - De/Para", "Valor Conta", "Tempo Conta", "Tempo Etapa", "Prioridade", "Supervisor"];
+  const headers = ["Unidade", "Convênio Conta Agrupado", "NR Atendimento", "NR Conta", "Paciente", "Etapa - De/Para", "Valor Conta", "Tempo Conta", "Tempo Etapa", "Protocolo", "Faixa de aging", "Em expedição", "Alerta de protocolo", "Supervisor"];
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("Contas acima de 5000");
   worksheet.addRow(headers);
-  rows.forEach((row) => worksheet.addRow([row.unidade, row.convenio, row.atendimento, row.conta, row.paciente, row.transicao, row.valor ?? "", row.tempoConta ?? "", row.tempoEtapa ?? "", statusInfo[getStatus(row)].label, getSupervisor(row) || ""]));
-  worksheet.columns = [{ width: 22 }, { width: 24 }, { width: 16 }, { width: 16 }, { width: 24 }, { width: 34 }, { width: 16 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 16 }];
+  rows.forEach((row) => worksheet.addRow([row.unidade, row.convenio, row.atendimento, row.conta, row.paciente, row.transicao, row.valor ?? "", row.tempoConta ?? "", row.tempoEtapa ?? "", row.protocolo, statusInfo[getStatus(row)].label, isShipping(row.etapa) ? "Sim" : "Não", isProtocolMissing(row) ? "Sem protocolo" : "", getSupervisor(row) || ""]));
+  worksheet.columns = [{ width: 22 }, { width: 24 }, { width: 16 }, { width: 16 }, { width: 24 }, { width: 34 }, { width: 16 }, { width: 14 }, { width: 14 }, { width: 18 }, { width: 18 }, { width: 16 }, { width: 22 }, { width: 16 }];
   worksheet.eachRow({ includeEmpty: true }, (row) => {
     row.eachCell({ includeEmpty: true }, (cell) => {
       cell.font = { name: "Aptos Narrow", size: 11, ...(row.number === 1 ? { bold: true } : {}) };
