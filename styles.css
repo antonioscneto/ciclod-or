@@ -25,6 +25,19 @@ body { margin: 0; min-width: 320px; background: var(--canvas); }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
 .app-shell { width: min(1440px, 100%); margin: 0 auto; padding: 0 42px 24px; }
+.view-tabs { display: flex; gap: 5px; margin: 2px 0 15px; border-bottom: 1px solid var(--line); }
+.view-tab { position: relative; padding: 9px 13px; border: 0; color: var(--muted); background: transparent; font-size: 11px; font-weight: 700; }
+.view-tab:hover { color: var(--green); }
+.view-tab.is-active { color: var(--green); }
+.view-tab.is-active::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; background: var(--green); content: ""; }
+.schedule-view[hidden] { display: none; }
+.schedule-panel { min-height: 230px; }
+.schedule-description { margin: 20px 0 14px; color: #68736e; font-size: 11px; }
+.schedule-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.schedule-hint { margin: 13px 0 0; color: #89938e; font-size: 10px; }
+.schedule-message { min-height: 16px; margin: 10px 0 0; color: var(--green); font-size: 10px; }
+.schedule-message.is-error { color: var(--red); }
+.schedule-message:empty { display: none; }
 .topbar { height: 66px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; color: #ffffff; background: #0b2545; border-radius: 0 0 5px 5px; }
 .brand { display: inline-flex; align-items: center; color: inherit; text-decoration: none; }
 .header-brand { gap: 0; }

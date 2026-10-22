@@ -1,4 +1,4 @@
-const state = { rows: [], filtered: [], fileName: "", hasProtocolColumn: false };
+const state = { rows: [], filtered: [], fileName: "", hasProtocolColumn: false, closingRecords: [] };
 
 const fields = {
   etapa: ["etapa"],
@@ -58,7 +58,9 @@ const elements = Object.fromEntries([
   "file-input", "upload-button", "browse-button", "sample-button", "drop-zone", "message", "dataset-label",
   "kpi-count", "kpi-count-foot", "kpi-value", "kpi-critical", "kpi-severe", "kpi-shipping", "status-total",
   "status-chart", "unit-chart", "search-input", "unit-filter", "stage-filter", "status-filter", "result-count", "table-body",
-  "table-page-info", "export-button", "updated-at", "supervisor-section", "supervisor-grid", "header-logo", "logo-fallback"
+  "table-page-info", "export-button", "updated-at", "supervisor-section", "supervisor-grid", "header-logo", "logo-fallback",
+  "analysis-tab", "schedule-tab", "analysis-view", "schedule-view", "schedule-upload-button", "schedule-file-input",
+  "schedule-clear-button", "schedule-count", "schedule-message"
 ].map((id) => [id.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase()), document.getElementById(id)]));
 
 function normalize(value) {
@@ -197,6 +199,10 @@ function isSummaryRow(cells) {
   return cells.some((cell) => ["total", "totalgeral"].includes(normalize(cell)));
 }
 
+function isPowerBiFilterRow(cells) {
+  return cells.some((cell) => normalize(cell).startsWith("filtrosaplicados"));
+}
+
 function rowsFromMatrix(matrix) {
   if (!matrix.length) throw new Error("A planilha está vazia.");
   const headers = matrix[0].map(normalize);
@@ -213,7 +219,7 @@ function rowsFromMatrix(matrix) {
   })[field]);
   if (missing.length) throw new Error(`Colunas não encontradas: ${missing.join(", ")}.`);
 
-  return matrix.slice(1).filter((cells) => !isSummaryRow(cells)).map((cells, index) => {
+  return matrix.slice(1).filter((cells) => !isSummaryRow(cells) && !isPowerBiFilterRow(cells)).map((cells, index) => {
     const value = (field) => indexes[field] < 0 ? "" : String(cells[indexes[field]] ?? "").trim();
     const transicao = value("transicao");
     return {
@@ -232,6 +238,111 @@ function rowsFromMatrix(matrix) {
       unidade: value("unidade") || "Não informada"
     };
   }).filter((row) => row.unidade !== "Não informada" || row.conta || row.atendimento);
+}
+
+function groupPdfTextRows(items) {
+  const rows = [];
+  for (const item of items) {
+    const y = item.transform?.[5];
+    if (!Number.isFinite(y) || !String(item.str ?? "").trim()) continue;
+    let row = rows.find((candidate) => Math.abs(candidate.y - y) <= 3.5);
+    if (!row) {
+      row = { y, items: [] };
+      rows.push(row);
+    }
+    row.items.push({ text: item.str.trim(), x: item.transform[4] });
+  }
+  return rows;
+}
+
+async function scheduleRecordsFromPDF(file) {
+  if (!window.pdfjsLib) throw new Error("O leitor de PDF não carregou. Verifique a conexão e recarregue a página.");
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  const document = await window.pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const records = [];
+  let foundXmlHeader = false;
+
+  for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+    const page = await document.getPage(pageNumber);
+    const textContent = await page.getTextContent();
+    const rows = groupPdfTextRows(textContent.items);
+    const heading = rows.find((row) => normalize(row.items.map((item) => item.text).join(" ")).includes("enviodoxml"));
+    if (!heading) continue;
+    foundXmlHeader = true;
+
+    const xmlHeader = heading.items.find((item) => normalize(item.text).includes("enviodoxml"));
+    const adjacentHeaders = heading.items
+      .filter((item) => item !== xmlHeader && item.x !== xmlHeader.x)
+      .map((item) => item.x)
+      .sort((a, b) => a - b);
+    const previousHeader = adjacentHeaders.filter((x) => x < xmlHeader.x).at(-1);
+    const nextHeader = adjacentHeaders.find((x) => x > xmlHeader.x);
+    const xmlLeft = previousHeader === undefined ? 0 : (previousHeader + xmlHeader.x) / 2;
+    const xmlRight = nextHeader === undefined ? page.getViewport({ scale: 1 }).width : (xmlHeader.x + nextHeader) / 2;
+    let currentLabel = "";
+
+    for (const row of rows.filter((candidate) => candidate.y < heading.y - 2).sort((a, b) => b.y - a.y)) {
+      const labelParts = row.items
+        .filter((item) => item.x < xmlLeft)
+        .sort((a, b) => a.x - b.x)
+        .map((item) => item.text);
+      if (labelParts.length) {
+        currentLabel = labelParts.join(" ").trim();
+      }
+
+      const xmlText = row.items.filter((item) => item.x >= xmlLeft && item.x < xmlRight).map((item) => item.text).join(" ");
+      const dateMatches = [...xmlText.matchAll(/\b(\d{1,2})[./-](\d{1,2})(?:[./-]\d{2,4})?\b/g)];
+      const closingDay = dateMatches.length ? Number(dateMatches.at(-1)[1]) : null;
+      if (currentLabel && closingDay >= 1 && closingDay <= 31) {
+        records.push({ label: currentLabel, closingDays: [closingDay] });
+      }
+    }
+  }
+
+  if (!foundXmlHeader) throw new Error("Não encontrei a coluna “Envio do XML” no PDF do cronograma. Confira se o arquivo contém texto selecionável.");
+  if (!records.length) throw new Error("Não encontrei datas na coluna “Envio do XML” do PDF.");
+  const groupedRecords = new Map();
+  for (const record of records) {
+    const key = normalize(record.label);
+    const existing = groupedRecords.get(key);
+    if (existing) existing.closingDays = [...new Set([...existing.closingDays, ...record.closingDays])].sort((a, b) => a - b);
+    else groupedRecords.set(key, record);
+  }
+  return [...groupedRecords.values()];
+}
+
+const scheduleAgreementAliases = {
+  abertta: ["abertta"],
+  bradesco: ["bradescomediservice"],
+  camaradosdeputados: ["camarasdeputados"],
+  hospitau: ["itauseg"],
+  omint: ["omintskillkipp"],
+  vale: ["valematernidadeitaim"]
+};
+
+function agreementMatches(scheduleLabel, agreement) {
+  const normalizedSchedule = normalize(scheduleLabel);
+  const normalizedAgreement = normalize(agreement);
+  if (normalizedSchedule && normalizedAgreement
+    && (normalizedSchedule.includes(normalizedAgreement) || normalizedAgreement.includes(normalizedSchedule))) return true;
+  if (scheduleAgreementAliases[normalizedAgreement]?.some((alias) => normalizedSchedule.includes(alias))) return true;
+  const tokens = (value) => String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().match(/[a-z0-9]+/g) ?? [];
+  const scheduleTokens = tokens(scheduleLabel);
+  const ignoredTokens = new Set(["saude", "seguro", "seguros", "plano", "convenio", "conta", "novo", "somente", "hospital", "empresarial"]);
+  const agreementTokens = tokens(agreement).filter((token) => !ignoredTokens.has(token));
+  return agreementTokens.some((agreementToken) => scheduleTokens.some((scheduleToken) => (
+    agreementToken === scheduleToken
+    || (Math.min(agreementToken.length, scheduleToken.length) >= 5
+      && (agreementToken.startsWith(scheduleToken) || scheduleToken.startsWith(agreementToken)))
+  )));
+}
+
+function getClosingDays(row) {
+  if (!["6", "7", "8"].includes(getStageCode(row.etapa))) return "—";
+  const days = [...new Set(state.closingRecords
+    .filter((record) => agreementMatches(record.label, row.convenio))
+    .flatMap((record) => record.closingDays))].sort((a, b) => a - b);
+  return days.length ? days.map((day) => String(day).padStart(2, "0")).join(", ") : "—";
 }
 
 function isShipping(stage) {
@@ -276,6 +387,16 @@ function escapeHTML(value) {
 
 function setMessage(message = "") {
   elements.message.textContent = message;
+}
+
+function selectView(view) {
+  const isSchedule = view === "schedule";
+  elements.analysisTab.classList.toggle("is-active", !isSchedule);
+  elements.scheduleTab.classList.toggle("is-active", isSchedule);
+  elements.analysisTab.setAttribute("aria-selected", String(!isSchedule));
+  elements.scheduleTab.setAttribute("aria-selected", String(isSchedule));
+  elements.analysisView.hidden = isSchedule;
+  elements.scheduleView.hidden = !isSchedule;
 }
 
 function setRows(rows, fileName, hasProtocolColumn = false) {
@@ -389,7 +510,7 @@ function renderTable(rows) {
   elements.resultCount.textContent = `${formatCount(topRows.length)} de ${formatCount(rows.length)} contas`;
   elements.tablePageInfo.textContent = rows.length ? `Exibindo ${formatCount(topRows.length)} de ${formatCount(rows.length)} filtradas` : "";
   if (!rows.length) {
-    elements.tableBody.innerHTML = '<tr class="empty-row"><td colspan="11"><span class="empty-mark">⌕</span><strong>Nenhuma conta encontrada</strong><span>Ajuste os filtros e tente novamente.</span></td></tr>';
+    elements.tableBody.innerHTML = '<tr class="empty-row"><td colspan="13"><span class="empty-mark">⌕</span><strong>Nenhuma conta encontrada</strong><span>Ajuste os filtros e tente novamente.</span></td></tr>';
     return;
   }
   elements.tableBody.innerHTML = topRows.map((row) => {
@@ -400,7 +521,7 @@ function renderTable(rows) {
       ...(isShipping(row.etapa) ? [`<span class="badge ${statusInfo.shipping.badge}">Em expedição</span>`] : []),
       ...(isProtocolMissing(row) ? ['<span class="badge badge-protocol-missing">Sem protocolo</span>'] : [])
     ].join("");
-    return `<tr><td>${escapeHTML(row.unidade)}</td><td>${escapeHTML(row.convenio || "—")}</td><td class="number-cell">${escapeHTML(row.atendimento || "—")}</td><td class="number-cell">${escapeHTML(row.conta || "—")}</td><td>${escapeHTML(row.paciente || "—")}</td><td class="stage-cell">${escapeHTML(row.transicao || "—")}</td><td class="number-cell">${formatCurrency(row.valor)}</td><td class="number-cell">${row.tempoConta === null ? "—" : `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(row.tempoConta)} dias`}</td><td class="number-cell">${row.tempoEtapa === null ? "—" : `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(row.tempoEtapa)} dias`}</td><td class="number-cell">${escapeHTML(row.protocolo || "—")}</td><td><div class="priority-badges">${badges}</div></td><td>${supervisor}</td></tr>`;
+    return `<tr><td>${escapeHTML(row.unidade)}</td><td>${escapeHTML(row.convenio || "—")}</td><td class="number-cell">${escapeHTML(row.atendimento || "—")}</td><td class="number-cell">${escapeHTML(row.conta || "—")}</td><td>${escapeHTML(row.paciente || "—")}</td><td class="stage-cell">${escapeHTML(row.transicao || "—")}</td><td class="number-cell">${formatCurrency(row.valor)}</td><td class="number-cell">${row.tempoConta === null ? "—" : `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(row.tempoConta)} dias`}</td><td class="number-cell">${row.tempoEtapa === null ? "—" : `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(row.tempoEtapa)} dias`}</td><td class="number-cell">${escapeHTML(row.protocolo || "—")}</td><td><div class="priority-badges">${badges}</div></td><td>${escapeHTML(supervisor)}</td><td class="number-cell">${getClosingDays(row)}</td></tr>`;
   }).join("");
 }
 
@@ -428,18 +549,49 @@ async function importFile(file) {
   }
 }
 
+async function importScheduleFile(file) {
+  if (!file) return;
+  elements.scheduleMessage.textContent = "";
+  elements.scheduleMessage.classList.remove("is-error");
+  try {
+    const extension = file.name.split(".").pop().toLowerCase();
+    if (extension !== "pdf") throw new Error("Formato não suportado. Envie o cronograma mensal em PDF.");
+    const records = await scheduleRecordsFromPDF(file);
+
+    state.closingRecords = records;
+    elements.scheduleCount.textContent = `${formatCount(records.length)} linhas de fechamento`;
+    elements.scheduleMessage.textContent = `Cronograma carregado: ${file.name}`;
+    elements.scheduleClearButton.disabled = false;
+    render();
+  } catch (error) {
+    elements.scheduleMessage.textContent = error instanceof Error ? error.message : "Não foi possível ler o cronograma.";
+    elements.scheduleMessage.classList.add("is-error");
+  } finally {
+    elements.scheduleFileInput.value = "";
+  }
+}
+
+function clearSchedule() {
+  state.closingRecords = [];
+  elements.scheduleCount.textContent = "Nenhum cronograma carregado";
+  elements.scheduleMessage.textContent = "";
+  elements.scheduleMessage.classList.remove("is-error");
+  elements.scheduleClearButton.disabled = true;
+  render();
+}
+
 async function exportExcel() {
   if (!window.ExcelJS) {
     setMessage("O recurso de Excel não carregou. Verifique a conexão e recarregue a página para exportar.");
     return;
   }
   const rows = sortRows(state.rows).filter((row) => row.valor !== null && row.valor > 5000);
-  const headers = ["Unidade", "Convênio Conta Agrupado", "NR Atendimento", "NR Conta", "Paciente", "Etapa - De/Para", "Valor Conta", "Tempo Conta", "Tempo Etapa", "Protocolo", "Faixa de aging", "Em expedição", "Alerta de protocolo", "Supervisor"];
+  const headers = ["Unidade", "Convênio Conta Agrupado", "NR Atendimento", "NR Conta", "Paciente", "Etapa - De/Para", "Valor Conta", "Tempo Conta", "Tempo Etapa", "Protocolo", "Faixa de aging", "Em expedição", "Alerta de protocolo", "Supervisor", "Fechamento"];
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("Contas acima de 5000");
   worksheet.addRow(headers);
-  rows.forEach((row) => worksheet.addRow([row.unidade, row.convenio, row.atendimento, row.conta, row.paciente, row.transicao, row.valor ?? "", row.tempoConta ?? "", row.tempoEtapa ?? "", row.protocolo, statusInfo[getStatus(row)].label, isShipping(row.etapa) ? "Sim" : "Não", isProtocolMissing(row) ? "Sem protocolo" : "", getSupervisor(row) || ""]));
-  worksheet.columns = [{ width: 22 }, { width: 24 }, { width: 16 }, { width: 16 }, { width: 24 }, { width: 34 }, { width: 16 }, { width: 14 }, { width: 14 }, { width: 18 }, { width: 18 }, { width: 16 }, { width: 22 }, { width: 16 }];
+  rows.forEach((row) => worksheet.addRow([row.unidade, row.convenio, row.atendimento, row.conta, row.paciente, row.transicao, row.valor ?? "", row.tempoConta ?? "", row.tempoEtapa ?? "", row.protocolo, statusInfo[getStatus(row)].label, isShipping(row.etapa) ? "Sim" : "Não", isProtocolMissing(row) ? "Sem protocolo" : "", getSupervisor(row) || "", getClosingDays(row)]));
+  worksheet.columns = [{ width: 22 }, { width: 24 }, { width: 16 }, { width: 16 }, { width: 24 }, { width: 34 }, { width: 16 }, { width: 14 }, { width: 14 }, { width: 18 }, { width: 18 }, { width: 16 }, { width: 22 }, { width: 16 }, { width: 18 }];
   worksheet.eachRow({ includeEmpty: true }, (row) => {
     row.eachCell({ includeEmpty: true }, (cell) => {
       cell.font = { name: "Aptos Narrow", size: 11, ...(row.number === 1 ? { bold: true } : {}) };
@@ -479,6 +631,11 @@ const sampleMatrix = [
 
 elements.uploadButton.addEventListener("click", () => elements.fileInput.click());
 elements.browseButton.addEventListener("click", () => elements.fileInput.click());
+elements.analysisTab.addEventListener("click", () => selectView("analysis"));
+elements.scheduleTab.addEventListener("click", () => selectView("schedule"));
+elements.scheduleUploadButton.addEventListener("click", () => elements.scheduleFileInput.click());
+elements.scheduleFileInput.addEventListener("change", (event) => importScheduleFile(event.target.files[0]));
+elements.scheduleClearButton.addEventListener("click", clearSchedule);
 const showLogoFallback = () => {
   elements.headerLogo.hidden = true;
   elements.logoFallback.hidden = false;

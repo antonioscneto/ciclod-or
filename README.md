@@ -21,7 +21,9 @@ Aplicação leve em HTML/JavaScript para analisar contas hospitalares usando as 
 - As faixas de aging são independentes de expedição: uma conta pode ser crítica ou severa e também estar em expedição.
 - Contas de Ricardo nas etapas `07` e `08` sem protocolo são sinalizadas. O protocolo é lido pelo cabeçalho `Protocolo` ou pela coluna `AX`.
 - Linhas de resumo identificadas como `Total` não entram na soma de `Valor Conta`.
+- A linha de filtros exportada pelo Power BI, identificada por `Filtros aplicados`, não é importada como conta.
 - O detalhamento mostra as 10 contas de maior `Valor Conta`, em ordem decrescente.
+- A coluna `Fechamento` aparece no detalhamento para as etapas `06`, `07` e `08`, usando o último dia de cada intervalo na coluna `Envio do XML` do cronograma PDF carregado e associando pelo convênio, sem restringir pela unidade.
 - A exportação Excel inclui todas as contas com `Valor Conta` acima de `R$ 5.000`, em ordem decrescente, mantendo a prioridade.
 - A análise também considera a transição em `Etapa - De/Para` para identificar avanço ou travamento.
 
@@ -30,7 +32,8 @@ Aplicação leve em HTML/JavaScript para analisar contas hospitalares usando as 
 1. Abra o arquivo `index.html` no navegador, ou rode um servidor local.
 2. Clique em `Enviar planilha`.
 3. Use CSV ou XLSX/XLS com as colunas acima.
-4. Aplique filtros por unidade, etapa e prioridade; o detalhamento e a exportação Excel mostram até 10 contas com os campos operacionais da planilha.
+4. Abra a aba `Cronograma` e envie o cronograma mensal em PDF. O fechamento é o último dia de cada intervalo na coluna `Envio do XML`; a coluna `Vencimento` e cronogramas em Excel não são utilizados.
+5. Aplique filtros por unidade, etapa e prioridade; o detalhamento mostra até 10 contas e a exportação Excel inclui o fechamento das contas nas etapas `06`, `07` e `08`.
 
 ## Executar localmente
 

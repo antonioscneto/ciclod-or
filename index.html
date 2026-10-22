@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="styles.css">
     <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script defer src="app.js"></script>
   </head>
   <body>
@@ -33,6 +34,12 @@
         </div>
       </section>
 
+      <nav class="view-tabs" role="tablist" aria-label="Seções do painel">
+        <button class="view-tab is-active" id="analysis-tab" type="button" role="tab" aria-selected="true" aria-controls="analysis-view">Análise</button>
+        <button class="view-tab" id="schedule-tab" type="button" role="tab" aria-selected="false" aria-controls="schedule-view">Cronograma</button>
+      </nav>
+
+      <section id="analysis-view" role="tabpanel" aria-labelledby="analysis-tab">
       <section class="upload-strip" id="drop-zone" aria-label="Importar planilha">
         <span class="upload-icon" aria-hidden="true">↥</span>
         <span><strong>Solte uma planilha aqui</strong><span class="upload-detail">CSV, XLSX ou XLS</span></span>
@@ -44,7 +51,7 @@
       <section class="kpi-grid" aria-label="Indicadores">
         <article class="kpi kpi-total"><div class="kpi-label">CONTAS ANALISADAS <span class="kpi-icon">▤</span></div><div class="kpi-value" id="kpi-count">—</div><div class="kpi-foot" id="kpi-count-foot">Aguardando planilha</div></article>
         <article class="kpi kpi-money"><div class="kpi-label">VALOR EM ABERTO <span class="kpi-icon">R$</span></div><div class="kpi-value" id="kpi-value">—</div><div class="kpi-foot">Soma das contas filtradas</div></article>
-        <article class="kpi kpi-critical"><div class="kpi-label">FAIXA CRÍTICA <span class="status-dot dot-critical"></span></div><div class="kpi-value" id="kpi-critical">—</div><div class="kpi-foot">60 a 75 dias na conta</div></article>
+        <article class="kpi kpi-critical"><div class="kpi-label">FAIXA CRÍTICA <span class="status-dot dot-critical"></span></div><div class="kpi-value" id="kpi-critical">—</div><div class="kpi-foot">60 a 75 dias</div></article>
         <article class="kpi kpi-severe"><div class="kpi-label">FAIXA SEVERA <span class="status-dot dot-severe"></span></div><div class="kpi-value" id="kpi-severe">—</div><div class="kpi-foot">Tempo Conta = +75</div></article>
         <article class="kpi kpi-shipping"><div class="kpi-label">EM EXPEDIÇÃO <span class="status-dot dot-shipping"></span></div><div class="kpi-value" id="kpi-shipping">—</div><div class="kpi-foot">Etapas 6, 7 ou 8 · pode sobrepor faixas</div></article>
       </section>
@@ -78,11 +85,29 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Unidade</th><th>Convênio Conta Agrupado</th><th>NR Atendimento</th><th>NR Conta</th><th>Paciente</th><th>Etapa De/Para</th><th>Valor Conta</th><th>Tempo Conta</th><th>Tempo Etapa</th><th>Protocolo</th><th>Prioridade / alertas</th><th>Supervisor</th></tr></thead>
-            <tbody id="table-body"><tr class="empty-row"><td colspan="12"><span class="empty-mark">＋</span><strong>Sua carteira começa aqui</strong><span>Envie uma planilha ou abra os dados de exemplo.</span></td></tr></tbody>
+            <thead><tr><th>Unidade</th><th>Convênio Conta Agrupado</th><th>NR Atendimento</th><th>NR Conta</th><th>Paciente</th><th>Etapa De/Para</th><th>Valor Conta</th><th>Tempo Conta</th><th>Tempo Etapa</th><th>Protocolo</th><th>Prioridade / alertas</th><th>Supervisor</th><th>Fechamento</th></tr></thead>
+            <tbody id="table-body"><tr class="empty-row"><td colspan="13"><span class="empty-mark">＋</span><strong>Sua carteira começa aqui</strong><span>Envie uma planilha ou abra os dados de exemplo.</span></td></tr></tbody>
           </table>
         </div>
         <footer class="table-footer"><span>Top 10 por valor · Excel exporta toda a carteira acima de R$ 5.000.</span><span id="table-page-info"></span></footer>
+      </section>
+      </section>
+
+      <section class="schedule-view" id="schedule-view" role="tabpanel" aria-labelledby="schedule-tab" hidden>
+        <article class="panel schedule-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">FECHAMENTO MENSAL</p><h2>Carregar cronograma</h2></div>
+            <span class="panel-unit" id="schedule-count">Nenhum cronograma carregado</span>
+          </div>
+          <p class="schedule-description">Envie o cronograma mensal em PDF. O fechamento usa o último dia de cada intervalo na coluna “Envio do XML”.</p>
+          <div class="schedule-actions">
+            <button class="button button-primary" id="schedule-upload-button" type="button"><span aria-hidden="true">↑</span> Enviar cronograma</button>
+            <input id="schedule-file-input" type="file" accept=".pdf" hidden>
+            <button class="button button-quiet" id="schedule-clear-button" type="button" disabled>Remover cronograma</button>
+          </div>
+          <p class="schedule-hint">As datas são associadas pelo convênio e valem para todas as unidades da conta. Apenas contas nas etapas 06, 07 e 08 exibem o fechamento.</p>
+          <p class="schedule-message" id="schedule-message" role="status" aria-live="polite"></p>
+        </article>
       </section>
       <footer class="app-footer"><span>CICLOD'OR <span class="footer-separator">/</span> AGING</span><span id="updated-at">A análise é atualizada ao importar os dados.</span></footer>
     </main>
