@@ -11,11 +11,13 @@ Aplicação leve em HTML/JavaScript para analisar contas hospitalares usando as 
 - Tempo Conta
 - Tempo Etapa
 - Unidade
+- Tipo Atendimento (para a regra da etapa `01 - Conta aberta`)
 
 ## Regra aplicada
 
 - As etapas `06 - Expedição, faturamento` e `07 - Expedição, protocolado` são consideradas em expedição.
 - A etapa `08 - Simultâneo, protocolado` também é considerada em expedição.
+- Na etapa `01 - Conta aberta`, o `Tipo Atendimento` `U` usa a mesma distribuição de convênios por supervisor das etapas `06`, `07` e `08`; os tipos `A` e `E` são atribuídos a Marcelo; e o tipo `I` é atribuído por unidade: Jabaquara a Felipe, Maternidade a Dino, Vila Nova Star a Márcia, Itaim a Andrea, Morumbi a Simone e Santa Isabel a Daniela.
 - Se `Tempo Conta` estiver entre `60` e `75`, a conta entra em situação crítica, inclusive quando também estiver em expedição.
 - Se `Tempo Conta` for maior que `75`, a conta é severa.
 - As faixas de aging são independentes de expedição: uma conta pode ser crítica ou severa e também estar em expedição.

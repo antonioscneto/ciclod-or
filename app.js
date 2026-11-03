@@ -12,6 +12,7 @@ const fields = {
   aging: ["agingconta"],
   valor: ["valorconta"],
   protocolo: ["protocolo", "nrprotocolo", "numeroprotocolo"],
+  tipoAtendimento: ["tipoatendimento"],
   unidade: ["unidade"]
 };
 
@@ -47,6 +48,20 @@ const supervisorPortfolios = {
   ]
 };
 
+const accountOpeningSupervisors = [
+  ...supervisorPortfolios["06-07-08"],
+  ...["Felipe", "Dino", "Márcia", "Andrea", "Simone", "Daniela"].map((name) => ({ name, agreements: [] }))
+];
+
+const accountOpeningUnitSupervisors = [
+  ["jabaquara", "Felipe"],
+  ["maternidade", "Dino"],
+  ["vilanovastar", "Márcia"],
+  ["itaim", "Andrea"],
+  ["morumbi", "Simone"],
+  ["santaisabel", "Daniela"]
+];
+
 const statusInfo = {
   normal: { label: "No prazo", badge: "badge-normal", bar: "bar-normal" },
   critical: { label: "Crítica", badge: "badge-critical", bar: "bar-critical" },
@@ -73,11 +88,22 @@ function getStageCode(value) {
 
 function getSupervisor(row) {
   const stageCode = getStageCode(row.etapa);
+  if (stageCode === "1") {
+    const type = normalize(row.tipoAtendimento);
+    if (type === "a" || type === "e") return "Marcelo";
+    if (type === "i") {
+      const unit = normalize(row.unidade);
+      return accountOpeningUnitSupervisors.find(([unitName]) => unit.includes(unitName))?.[1] ?? "";
+    }
+    if (type !== "u") return "";
+  }
   const definitions = stageCode === "4"
     ? supervisorPortfolios["04"]
-    : ["6", "7", "8"].includes(stageCode)
+    : stageCode === "1"
       ? supervisorPortfolios["06-07-08"]
-      : [];
+      : ["6", "7", "8"].includes(stageCode)
+        ? supervisorPortfolios["06-07-08"]
+        : [];
   return definitions.find(({ agreements }) => agreements.some((agreement) => normalize(agreement) === normalize(row.convenio)))?.name ?? "";
 }
 
@@ -86,26 +112,31 @@ function renderSupervisor(rows, selectedStage) {
   const isAllStages = !stageCode;
   const definitions = stageCode === "4"
     ? supervisorPortfolios["04"]
-    : ["6", "7", "8"].includes(stageCode)
-      ? supervisorPortfolios["06-07-08"]
-      : isAllStages
-        ? [
-          ...(rows.some((row) => getStageCode(row.etapa) === "4") ? supervisorPortfolios["04"] : []),
-          ...(rows.some((row) => ["6", "7", "8"].includes(getStageCode(row.etapa))) ? supervisorPortfolios["06-07-08"] : [])
-        ]
-        : null;
+    : stageCode === "1"
+      ? accountOpeningSupervisors
+      : ["6", "7", "8"].includes(stageCode)
+        ? supervisorPortfolios["06-07-08"]
+        : isAllStages
+          ? [
+            ...(rows.some((row) => getStageCode(row.etapa) === "1") ? accountOpeningSupervisors : []),
+            ...(rows.some((row) => getStageCode(row.etapa) === "4") ? supervisorPortfolios["04"] : []),
+            ...(rows.some((row) => ["6", "7", "8"].includes(getStageCode(row.etapa))) ? supervisorPortfolios["06-07-08"] : [])
+          ]
+          : null;
   const analysisRows = rows.filter((row) => {
     const rowStage = getStageCode(row.etapa);
+    if (stageCode === "1") return rowStage === "1";
     if (stageCode === "4") return rowStage === "4";
     if (["6", "7", "8"].includes(stageCode)) return ["6", "7", "8"].includes(rowStage);
-    return isAllStages && ["4", "6", "7", "8"].includes(rowStage);
+    return isAllStages && ["1", "4", "6", "7", "8"].includes(rowStage);
   });
 
-  elements.supervisorSection.hidden = !definitions || analysisRows.length === 0;
-  if (!definitions || analysisRows.length === 0) return;
+  const distinctDefinitions = definitions && [...new Map(definitions.map((definition) => [definition.name, definition])).values()];
+  elements.supervisorSection.hidden = !distinctDefinitions || analysisRows.length === 0;
+  if (!distinctDefinitions || analysisRows.length === 0) return;
 
   const analyzedValue = analysisRows.reduce((total, row) => total + (row.valor ?? 0), 0);
-  elements.supervisorGrid.innerHTML = definitions.map(({ name, agreements }) => {
+  elements.supervisorGrid.innerHTML = distinctDefinitions.map(({ name, agreements }) => {
     const accounts = analysisRows.filter((row) => getSupervisor(row) === name);
     const value = accounts.reduce((total, row) => total + (row.valor ?? 0), 0);
     const averageTicket = accounts.length ? value / accounts.length : null;
@@ -211,11 +242,11 @@ function rowsFromMatrix(matrix) {
     indexes[field] = headers.findIndex((header) => aliases.includes(header));
   }
   if (indexes.protocolo < 0 && headers.length > 49) indexes.protocolo = 49;
-  const optionalFields = new Set(["etapa", "aging", "protocolo"]);
+  const optionalFields = new Set(["etapa", "aging", "protocolo", "tipoAtendimento"]);
   const missing = Object.entries(indexes).filter(([field, index]) => index < 0 && !optionalFields.has(field)).map(([field]) => ({
     transicao: "Etapa - De/Para", convenio: "Convênio Conta Agrupado", atendimento: "NR Atendimento",
     conta: "NR Conta", paciente: "Paciente", tempoConta: "Tempo Conta", tempoEtapa: "Tempo Etapa",
-    valor: "Valor Conta", unidade: "Unidade"
+    valor: "Valor Conta", unidade: "Unidade", tipoAtendimento: "Tipo Atendimento"
   })[field]);
   if (missing.length) throw new Error(`Colunas não encontradas: ${missing.join(", ")}.`);
 
@@ -235,6 +266,7 @@ function rowsFromMatrix(matrix) {
       aging: parseNumber(cells[indexes.aging]),
       valor: parseNumber(cells[indexes.valor]),
       protocolo: value("protocolo"),
+      tipoAtendimento: value("tipoAtendimento"),
       unidade: value("unidade") || "Não informada"
     };
   }).filter((row) => row.unidade !== "Não informada" || row.conta || row.atendimento);
@@ -443,7 +475,7 @@ function render() {
   const stage = elements.stageFilter.value;
   const status = elements.statusFilter.value;
   state.filtered = state.rows.filter((row) => {
-    const matchesQuery = !query || normalize(`${row.unidade} ${row.convenio} ${row.atendimento} ${row.conta} ${row.paciente} ${row.transicao}`).includes(query);
+    const matchesQuery = !query || normalize(`${row.unidade} ${row.convenio} ${row.atendimento} ${row.conta} ${row.paciente} ${row.transicao} ${row.tipoAtendimento}`).includes(query);
     const matchesStatus = !status
       || (status === "shipping" ? isShipping(row.etapa)
         : status === "missing-protocol" ? isProtocolMissing(row)
