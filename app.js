@@ -44,7 +44,7 @@ const supervisorPortfolios = {
   "06-07-08": [
     { name: "Ricardo", agreements: ["Abertta Saúde", "Cabesp", "Caixa Econômica", "Câmara dos Deputados", "CET", "Economus", "Amil", "Hospitau", "Life Empresarial", "Metrus", "Omint", "Plan Assiste", "Porto Saúde", "Seguros Unimed", "Vale", "Vivest"] },
     { name: "Liliane", agreements: ["Care Plus", "Central Nacional Unimed", "IDOR", "Inspetoria Nossa Senhora Aparecida", "Instituto Religioso Barbara Maix", "Irmãs São José", "Lars Empreendimentos", "Notre Dame", "Santa Casa Mauá", "Saúde ABAS", "Saúde em Dia", "Seguradoras Internacionais", "Serpro", "Sul América", "Tribunal de Justiça Estado de São Paulo", "World Assist"] },
-    { name: "Marcelo", agreements: ["Afresp", "Bradesco", "Cassi", "Gama Saúde", "Mediservice", "Petrobras", "Senado Federal", "STF", "STJ", "Unafisco", "Unimed Fesp", "Usisaúde"] }
+    { name: "MARCELLO", agreements: ["Afresp", "Bradesco", "Cassi", "Gama Saúde", "Mediservice", "Petrobras", "Senado Federal", "STF", "STJ", "Unafisco", "Unimed Fesp", "Usisaúde"] }
   ]
 };
 
@@ -86,11 +86,16 @@ function getStageCode(value) {
   return String(value ?? "").match(/^\s*0*(\d+(?:\.\d+)?)/)?.[1]?.replace(/^0+(?=\d)/, "") ?? "";
 }
 
+function isAccountOpening(row) {
+  const sourceStage = String(row.transicao ?? "").split(/\s*(?:→|->|>)\s*/)[0];
+  return getStageCode(row.etapa) === "1" || getStageCode(canonicalStage(sourceStage)) === "1";
+}
+
 function getSupervisor(row) {
   const stageCode = getStageCode(row.etapa);
-  if (stageCode === "1") {
+  if (isAccountOpening(row)) {
     const type = normalize(row.tipoAtendimento);
-    if (type === "a" || type === "e") return "Marcelo";
+    if (type === "a" || type === "e") return "MARCELLO";
     if (type === "i") {
       const unit = normalize(row.unidade);
       return accountOpeningUnitSupervisors.find(([unitName]) => unit.includes(unitName))?.[1] ?? "";
@@ -99,7 +104,7 @@ function getSupervisor(row) {
   }
   const definitions = stageCode === "4"
     ? supervisorPortfolios["04"]
-    : stageCode === "1"
+    : isAccountOpening(row)
       ? supervisorPortfolios["06-07-08"]
       : ["6", "7", "8"].includes(stageCode)
         ? supervisorPortfolios["06-07-08"]
@@ -118,17 +123,17 @@ function renderSupervisor(rows, selectedStage) {
         ? supervisorPortfolios["06-07-08"]
         : isAllStages
           ? [
-            ...(rows.some((row) => getStageCode(row.etapa) === "1") ? accountOpeningSupervisors : []),
+            ...(rows.some(isAccountOpening) ? accountOpeningSupervisors : []),
             ...(rows.some((row) => getStageCode(row.etapa) === "4") ? supervisorPortfolios["04"] : []),
             ...(rows.some((row) => ["6", "7", "8"].includes(getStageCode(row.etapa))) ? supervisorPortfolios["06-07-08"] : [])
           ]
           : null;
   const analysisRows = rows.filter((row) => {
     const rowStage = getStageCode(row.etapa);
-    if (stageCode === "1") return rowStage === "1";
+    if (stageCode === "1") return isAccountOpening(row);
     if (stageCode === "4") return rowStage === "4";
     if (["6", "7", "8"].includes(stageCode)) return ["6", "7", "8"].includes(rowStage);
-    return isAllStages && ["1", "4", "6", "7", "8"].includes(rowStage);
+    return isAllStages && (isAccountOpening(row) || ["4", "6", "7", "8"].includes(rowStage));
   });
 
   const distinctDefinitions = definitions && [...new Map(definitions.map((definition) => [definition.name, definition])).values()];
@@ -480,7 +485,9 @@ function render() {
       || (status === "shipping" ? isShipping(row.etapa)
         : status === "missing-protocol" ? isProtocolMissing(row)
           : getStatus(row) === status);
-    return matchesQuery && (!unit || row.unidade === unit) && (!stage || row.etapa === stage) && matchesStatus;
+    return matchesQuery && (!unit || row.unidade === unit)
+      && (!stage || row.etapa === stage || (getStageCode(stage) === "1" && isAccountOpening(row)))
+      && matchesStatus;
   });
   const rows = sortRows(state.filtered);
   renderMetrics(state.filtered);
