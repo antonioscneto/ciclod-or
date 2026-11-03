@@ -17,7 +17,7 @@ Aplicação leve em HTML/JavaScript para analisar contas hospitalares usando as 
 
 - As etapas `06 - Expedição, faturamento` e `07 - Expedição, protocolado` são consideradas em expedição.
 - A etapa `08 - Simultâneo, protocolado` também é considerada em expedição.
-- Quando a origem da transição `Etapa - De/Para` ou a etapa atual é `01 - Conta aberta`, o `Tipo Atendimento` `U` usa a mesma distribuição de convênios por supervisor das etapas `06`, `07` e `08`; os tipos `A` e `E` são atribuídos a MARCELLO; e o tipo `I` é atribuído por unidade: Jabaquara a Felipe, Maternidade a Dino, Vila Nova Star a Márcia, Itaim a Andrea, Morumbi a Simone e Santa Isabel a Daniela.
+- Quando a origem da transição `Etapa - De/Para` ou a etapa atual é `01 - Conta aberta`, o `Tipo Atendimento` `U` usa a mesma distribuição de convênios por supervisor das etapas `06`, `07` e `08`; os tipos `A` e `E` são atribuídos a Marcello; e o tipo `I` é atribuído por unidade: Jabaquara a Felipe, Maternidade a Dino, Vila Nova Star a Márcia, Itaim a Andrea, Morumbi a Simone e Santa Isabel a Daniela.
 - Se `Tempo Conta` estiver entre `60` e `75`, a conta entra em situação crítica, inclusive quando também estiver em expedição.
 - Se `Tempo Conta` for maior que `75`, a conta é severa.
 - As faixas de aging são independentes de expedição: uma conta pode ser crítica ou severa e também estar em expedição.
@@ -26,8 +26,9 @@ Aplicação leve em HTML/JavaScript para analisar contas hospitalares usando as 
 - A linha de filtros exportada pelo Power BI, identificada por `Filtros aplicados`, não é importada como conta.
 - O detalhamento mostra as 10 contas de maior `Valor Conta`, em ordem decrescente.
 - A coluna `Fechamento` aparece no detalhamento para as etapas `06`, `07` e `08`, usando o último dia de cada intervalo na coluna `Envio do XML` do cronograma PDF carregado e associando pelo convênio, sem restringir pela unidade.
-- A exportação Excel inclui todas as contas com `Valor Conta` acima de `R$ 5.000`, em ordem decrescente, mantendo a prioridade.
+- A exportação Excel inclui todas as contas cuja etapa atual ou origem da transição é `01 - Conta aberta`, independentemente do valor; nas demais etapas, inclui contas com `Valor Conta` acima de `R$ 5.000`. A lista é ordenada por valor decrescente e mantém a prioridade.
 - A análise também considera a transição em `Etapa - De/Para` para identificar avanço ou travamento.
+- A consolidação por supervisor mostra apenas carteiras cujo valor total seja diferente de zero.
 
 ## Como usar
 

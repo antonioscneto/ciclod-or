@@ -44,7 +44,7 @@ const supervisorPortfolios = {
   "06-07-08": [
     { name: "Ricardo", agreements: ["Abertta Saúde", "Cabesp", "Caixa Econômica", "Câmara dos Deputados", "CET", "Economus", "Amil", "Hospitau", "Life Empresarial", "Metrus", "Omint", "Plan Assiste", "Porto Saúde", "Seguros Unimed", "Vale", "Vivest"] },
     { name: "Liliane", agreements: ["Care Plus", "Central Nacional Unimed", "IDOR", "Inspetoria Nossa Senhora Aparecida", "Instituto Religioso Barbara Maix", "Irmãs São José", "Lars Empreendimentos", "Notre Dame", "Santa Casa Mauá", "Saúde ABAS", "Saúde em Dia", "Seguradoras Internacionais", "Serpro", "Sul América", "Tribunal de Justiça Estado de São Paulo", "World Assist"] },
-    { name: "MARCELLO", agreements: ["Afresp", "Bradesco", "Cassi", "Gama Saúde", "Mediservice", "Petrobras", "Senado Federal", "STF", "STJ", "Unafisco", "Unimed Fesp", "Usisaúde"] }
+    { name: "Marcello", agreements: ["Afresp", "Bradesco", "Cassi", "Gama Saúde", "Mediservice", "Petrobras", "Senado Federal", "STF", "STJ", "Unafisco", "Unimed Fesp", "Usisaúde"] }
   ]
 };
 
@@ -95,7 +95,7 @@ function getSupervisor(row) {
   const stageCode = getStageCode(row.etapa);
   if (isAccountOpening(row)) {
     const type = normalize(row.tipoAtendimento);
-    if (type === "a" || type === "e") return "MARCELLO";
+    if (type === "a" || type === "e") return "Marcello";
     if (type === "i") {
       const unit = normalize(row.unidade);
       return accountOpeningUnitSupervisors.find(([unitName]) => unit.includes(unitName))?.[1] ?? "";
@@ -141,17 +141,20 @@ function renderSupervisor(rows, selectedStage) {
   if (!distinctDefinitions || analysisRows.length === 0) return;
 
   const analyzedValue = analysisRows.reduce((total, row) => total + (row.valor ?? 0), 0);
-  elements.supervisorGrid.innerHTML = distinctDefinitions.map(({ name, agreements }) => {
+  const cards = distinctDefinitions.flatMap(({ name }) => {
     const accounts = analysisRows.filter((row) => getSupervisor(row) === name);
     const value = accounts.reduce((total, row) => total + (row.valor ?? 0), 0);
+    if (value === 0) return [];
     const averageTicket = accounts.length ? value / accounts.length : null;
     const agingValues = accounts.map((row) => row.aging ?? row.tempoConta).filter((aging) => aging !== null && Number.isFinite(aging));
     const averageAging = agingValues.length ? agingValues.reduce((total, aging) => total + aging, 0) / agingValues.length : null;
     const share = analyzedValue > 0 ? value / analyzedValue * 100 : 0;
     const formatAverage = (number) => number === null ? "—" : new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(number);
 
-    return `<article class="supervisor-card"><h3>${name}</h3><dl class="supervisor-stats"><div><dt>Contas</dt><dd>${formatCount(accounts.length)}</dd></div><div><dt>Valor</dt><dd>${formatCurrency(value, true)}</dd></div><div><dt>Ticket médio</dt><dd>${formatCurrency(averageTicket, true)}</dd></div><div><dt>Aging médio</dt><dd>${averageAging === null ? "—" : `${formatAverage(averageAging)} dias`}</dd></div><div><dt>Participação</dt><dd>${formatAverage(share)}%</dd></div></dl></article>`;
-  }).join("");
+    return [`<article class="supervisor-card"><h3>${name}</h3><dl class="supervisor-stats"><div><dt>Contas</dt><dd>${formatCount(accounts.length)}</dd></div><div><dt>Valor</dt><dd>${formatCurrency(value, true)}</dd></div><div><dt>Ticket médio</dt><dd>${formatCurrency(averageTicket, true)}</dd></div><div><dt>Aging médio</dt><dd>${averageAging === null ? "—" : `${formatAverage(averageAging)} dias`}</dd></div><div><dt>Participação</dt><dd>${formatAverage(share)}%</dd></div></dl></article>`];
+  });
+  elements.supervisorSection.hidden = cards.length === 0;
+  elements.supervisorGrid.innerHTML = cards.join("");
 }
 
 function canonicalStage(value) {
@@ -474,6 +477,10 @@ function sortRows(rows) {
   });
 }
 
+function isExportableRow(row) {
+  return isAccountOpening(row) || (row.valor !== null && row.valor > 5000);
+}
+
 function render() {
   const query = normalize(elements.searchInput.value);
   const unit = elements.unitFilter.value;
@@ -545,7 +552,7 @@ function renderUnitChart(rows) {
 
 function renderTable(rows) {
   const topRows = rows.slice(0, 10);
-  elements.exportButton.disabled = !state.rows.some((row) => row.valor !== null && row.valor > 5000);
+  elements.exportButton.disabled = !state.rows.some(isExportableRow);
   elements.resultCount.textContent = `${formatCount(topRows.length)} de ${formatCount(rows.length)} contas`;
   elements.tablePageInfo.textContent = rows.length ? `Exibindo ${formatCount(topRows.length)} de ${formatCount(rows.length)} filtradas` : "";
   if (!rows.length) {
@@ -624,10 +631,10 @@ async function exportExcel() {
     setMessage("O recurso de Excel não carregou. Verifique a conexão e recarregue a página para exportar.");
     return;
   }
-  const rows = sortRows(state.rows).filter((row) => row.valor !== null && row.valor > 5000);
+  const rows = sortRows(state.rows).filter(isExportableRow);
   const headers = ["Unidade", "Convênio Conta Agrupado", "NR Atendimento", "NR Conta", "Paciente", "Etapa - De/Para", "Valor Conta", "Tempo Conta", "Tempo Etapa", "Protocolo", "Faixa de aging", "Em expedição", "Alerta de protocolo", "Supervisor", "Fechamento"];
   const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet("Contas acima de 5000");
+  const worksheet = workbook.addWorksheet("Contas exportadas");
   worksheet.addRow(headers);
   rows.forEach((row) => worksheet.addRow([row.unidade, row.convenio, row.atendimento, row.conta, row.paciente, row.transicao, row.valor ?? "", row.tempoConta ?? "", row.tempoEtapa ?? "", row.protocolo, statusInfo[getStatus(row)].label, isShipping(row.etapa) ? "Sim" : "Não", isProtocolMissing(row) ? "Sem protocolo" : "", getSupervisor(row) || "", getClosingDays(row)]));
   worksheet.columns = [{ width: 22 }, { width: 24 }, { width: 16 }, { width: 16 }, { width: 24 }, { width: 34 }, { width: 16 }, { width: 14 }, { width: 14 }, { width: 18 }, { width: 18 }, { width: 16 }, { width: 22 }, { width: 16 }, { width: 18 }];
